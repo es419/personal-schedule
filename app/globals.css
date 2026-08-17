@@ -101,6 +101,13 @@ button { cursor: pointer; }
 .eventActions { display: flex; gap: 3px; }
 .eventActions button { width: 34px; height: 34px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); border-radius: 10px; }
 .eventActions button:hover { background: var(--surface-2); color: var(--text); }
+.eventCard.eventCompleted { border-color: color-mix(in srgb, var(--danger) 32%, var(--line)); background: color-mix(in srgb, var(--surface) 92%, var(--danger) 8%); opacity: .72; transition: opacity .2s ease, border-color .2s ease, background .2s ease; }
+.eventCard.eventCompleted .eventAccent { background: var(--danger); }
+.eventCard.eventCompleted .eventTime strong,
+.eventCard.eventCompleted .eventTime span,
+.eventCard.eventCompleted .eventInfo h4 { text-decoration: line-through; text-decoration-thickness: 1.5px; text-decoration-color: color-mix(in srgb, var(--danger) 72%, currentColor); }
+.eventCard.eventCompleted .eventActions { opacity: .72; }
+.completedPill { flex: none; font-size: 10px; color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--danger) 24%, var(--line)); padding: 3px 7px; border-radius: 20px; font-weight: 700; }
 
 .dayStrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 8px; }
 .dayStrip button { border: 0; background: transparent; border-radius: 14px; padding: 8px 2px 7px; display: grid; justify-items: center; gap: 3px; min-width: 0; }
