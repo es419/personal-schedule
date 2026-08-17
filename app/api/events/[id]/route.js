@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { deleteEvent, updateEvent } from "@/lib/sheets";
+import { reminderServiceConfigured } from "@/lib/telegram";
 
 function unauthorized(message = "Unauthorized") {
   return Response.json({ error: message }, { status: 401 });
@@ -19,6 +20,13 @@ function getGoogleAccess(session) {
   return session.accessToken;
 }
 
+function parseReminderMinutes(value) {
+  if (value === null || value === undefined || value === "" || Number(value) <= 0) return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 43200) return NaN;
+  return parsed;
+}
+
 export async function PATCH(request, { params }) {
   const session = await getServerSession(authOptions);
   if (!session) return unauthorized();
@@ -32,6 +40,12 @@ export async function PATCH(request, { params }) {
       return Response.json({ error: "Invalid event" }, { status: 400 });
     }
 
+    const reminderMinutes = parseReminderMinutes(body.reminderMinutes);
+    if (Number.isNaN(reminderMinutes)) return Response.json({ error: "Invalid reminder" }, { status: 400 });
+    if (reminderMinutes && !reminderServiceConfigured()) {
+      return Response.json({ error: "Reminder service is not configured" }, { status: 503 });
+    }
+
     const event = {
       id,
       title: body.title.trim(),
@@ -40,6 +54,7 @@ export async function PATCH(request, { params }) {
       end: body.end,
       category: body.category || "אישי",
       notes: body.notes?.trim() || "",
+      reminderMinutes,
     };
 
     const updated = await updateEvent(id, body.previousDate, event, accessToken);

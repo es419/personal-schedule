@@ -45,9 +45,9 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
 body { font-family: Arial, "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; }
-button, input, textarea { font: inherit; }
+button, input, textarea, select { font: inherit; }
 button { color: inherit; }
-button, input, textarea { -webkit-tap-highlight-color: transparent; }
+button, input, textarea, select { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 
 .splash, .loginPage { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
@@ -168,4 +168,33 @@ button { cursor: pointer; }
   .heroCard { grid-template-columns: 1.3fr .7fr .9fr; padding: 18px; }.heroCard h2 { font-size: 22px; }.heroStat strong { font-size: 17px; }
   .eventCard { grid-template-columns: 54px 1fr auto; gap: 9px; padding-left: 9px; }.eventActions { flex-direction: column; }.eventActions button { width: 30px; height: 28px; }
   .categoryPill { display: none; }
+}
+
+.reminderMeta { margin-top: 5px; display: flex; align-items: center; gap: 4px; color: var(--primary); font-size: 11px; font-weight: 700; }
+.reminderFormCard { gap: 14px; }
+.reminderHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.reminderHeader > div { min-width: 0; }
+.fieldLabel { display: block; font-size: 13px; font-weight: 800; }
+.reminderHeader small { display: block; color: var(--muted); font-size: 11px; margin-top: 4px; }
+.reminderSwitch { width: 50px; height: 30px; padding: 3px; border: 0; border-radius: 18px; background: var(--line); transition: background .18s ease; flex: none; }
+.reminderSwitch i { display: block; width: 24px; height: 24px; border-radius: 50%; background: white; box-shadow: 0 2px 7px rgba(0,0,0,.17); transform: translateX(0); transition: transform .18s ease; }
+.reminderSwitch.on { background: var(--primary); }
+.reminderSwitch.on i { transform: translateX(-20px); }
+.reminderSettings { display: grid; gap: 12px; padding-top: 2px; }
+.reminderOptions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.reminderOptions button { min-height: 39px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); border-radius: 11px; font-size: 11px; font-weight: 700; padding: 7px 5px; }
+.reminderOptions button.selected { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.customReminder { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field select { width: 100%; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); outline: none; border-radius: 13px; padding: 12px 13px; min-height: 46px; font: inherit; }
+.field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent); }
+.reminderPreview { display: flex; align-items: center; gap: 6px; background: var(--primary-soft); color: var(--primary); border-radius: 11px; padding: 9px 11px; font-size: 11px; font-weight: 700; }
+.telegramBox { display: grid; gap: 8px; padding: 2px 2px 0; }
+.telegramTitle { display: flex; align-items: center; gap: 7px; color: var(--text); }
+.telegramTitle strong { font-size: 13px; }
+.telegramBox > span { color: var(--muted); font-size: 11px; line-height: 1.55; }
+.telegramBox > button { min-height: 40px; border: 0; border-radius: 12px; background: var(--primary-soft); color: var(--primary); font-weight: 800; font-size: 12px; }
+.telegramBox > button:disabled { opacity: .6; cursor: default; }
+
+@media (max-width: 390px) {
+  .reminderOptions { grid-template-columns: repeat(2, 1fr); }
 }

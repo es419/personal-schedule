@@ -14,6 +14,49 @@ const CATEGORIES = [
   { name: "אישי", tone: "pink" },
 ];
 
+const REMINDER_PRESETS = [
+  { minutes: 5, label: "5 דקות" },
+  { minutes: 15, label: "15 דקות" },
+  { minutes: 30, label: "30 דקות" },
+  { minutes: 60, label: "שעה" },
+  { minutes: 1440, label: "יום" },
+];
+
+function emptyEventForm(date = "") {
+  return {
+    title: "", date, start: "09:00", end: "10:00", category: "אישי", notes: "",
+    reminderEnabled: false, reminderChoice: "15", reminderCustomValue: "30", reminderCustomUnit: "minutes",
+  };
+}
+
+function reminderFormState(minutesBefore) {
+  const value = Number(minutesBefore);
+  if (!Number.isFinite(value) || value <= 0) return { reminderEnabled: false, reminderChoice: "15", reminderCustomValue: "30", reminderCustomUnit: "minutes" };
+  if (REMINDER_PRESETS.some((preset) => preset.minutes === value)) {
+    return { reminderEnabled: true, reminderChoice: String(value), reminderCustomValue: "30", reminderCustomUnit: "minutes" };
+  }
+  if (value % 1440 === 0) return { reminderEnabled: true, reminderChoice: "custom", reminderCustomValue: String(value / 1440), reminderCustomUnit: "days" };
+  if (value % 60 === 0) return { reminderEnabled: true, reminderChoice: "custom", reminderCustomValue: String(value / 60), reminderCustomUnit: "hours" };
+  return { reminderEnabled: true, reminderChoice: "custom", reminderCustomValue: String(value), reminderCustomUnit: "minutes" };
+}
+
+function reminderMinutesFromForm(form) {
+  if (!form.reminderEnabled) return null;
+  if (form.reminderChoice !== "custom") return Number(form.reminderChoice);
+  const value = Number(form.reminderCustomValue);
+  const multiplier = form.reminderCustomUnit === "days" ? 1440 : form.reminderCustomUnit === "hours" ? 60 : 1;
+  return Number.isFinite(value) && value > 0 ? Math.round(value * multiplier) : NaN;
+}
+
+function reminderLabel(minutesBefore) {
+  const value = Number(minutesBefore);
+  if (value === 1440) return "יום לפני";
+  if (value > 0 && value % 1440 === 0) return `${value / 1440} ימים לפני`;
+  if (value === 60) return "שעה לפני";
+  if (value > 0 && value % 60 === 0) return `${value / 60} שעות לפני`;
+  return `${value} דקות לפני`;
+}
+
 function localISO(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -94,6 +137,7 @@ function Icon({ name, size = 22 }) {
   if (name === "back") return <svg {...common}><path d="m9 18 6-6-6-6"/></svg>;
   if (name === "forward") return <svg {...common}><path d="m15 18-6-6 6-6"/></svg>;
   if (name === "clock") return <svg {...common}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>;
+  if (name === "bell") return <svg {...common}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>;
   if (name === "edit") return <svg {...common}><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>;
   if (name === "trash") return <svg {...common}><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 10v6M14 10v6"/></svg>;
   if (name === "moon") return <svg {...common}><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/></svg>;
@@ -115,7 +159,9 @@ export default function Home() {
   const [theme, setTheme] = useState("system");
   const [editing, setEditing] = useState(null);
   const [toast, setToast] = useState("");
-  const [form, setForm] = useState({ title: "", date: "", start: "09:00", end: "10:00", category: "אישי", notes: "" });
+  const [telegramStatus, setTelegramStatus] = useState(null);
+  const [telegramBusy, setTelegramBusy] = useState(false);
+  const [form, setForm] = useState(emptyEventForm());
 
   useEffect(() => {
     const currentDate = new Date();
@@ -141,6 +187,16 @@ export default function Home() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("schedule-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!menuOpen || !session) return;
+    let cancelled = false;
+    fetch("/api/telegram/connect", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => { if (!cancelled && data) setTelegramStatus(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [menuOpen, session]);
 
   async function loadWeek(date = anchor) {
     if (!date || !session) return;
@@ -186,13 +242,22 @@ export default function Home() {
 
   function openAdd(date = selectedDate || today) {
     setEditing(null);
-    setForm({ title: "", date, start: "09:00", end: "10:00", category: "אישי", notes: "" });
+    setForm(emptyEventForm(date));
     setView("add");
   }
 
   function openEdit(event) {
     setEditing(event);
-    setForm({ title: event.title, date: event.date, start: event.start, end: event.end, category: event.category, notes: event.notes || "" });
+    setForm({
+      ...emptyEventForm(event.date),
+      title: event.title,
+      date: event.date,
+      start: event.start,
+      end: event.end,
+      category: event.category,
+      notes: event.notes || "",
+      ...reminderFormState(event.reminderMinutes),
+    });
     setView("add");
   }
 
@@ -200,12 +265,25 @@ export default function Home() {
     event.preventDefault();
     if (!form.title.trim()) return showToast("צריך לתת שם לאירוע");
     if (form.end <= form.start) return showToast("שעת הסיום צריכה להיות אחרי ההתחלה");
+    const reminderMinutes = reminderMinutesFromForm(form);
+    if (Number.isNaN(reminderMinutes) || (reminderMinutes && reminderMinutes > 43200)) {
+      return showToast("זמן התזכורת לא תקין");
+    }
+    const payload = {
+      title: form.title,
+      date: form.date,
+      start: form.start,
+      end: form.end,
+      category: form.category,
+      notes: form.notes,
+      reminderMinutes,
+    };
     setSaving(true);
     try {
       const response = await fetch(editing ? `/api/events/${editing.id}` : "/api/events", {
         method: editing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editing ? { ...form, previousDate: editing.date } : form),
+        body: JSON.stringify(editing ? { ...payload, previousDate: editing.date } : payload),
       });
       if (!response.ok) throw new Error("save");
       const data = await response.json();
@@ -222,6 +300,21 @@ export default function Home() {
       showToast("השמירה נכשלה");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function connectTelegram() {
+    setTelegramBusy(true);
+    try {
+      const response = await fetch("/api/telegram/connect", { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "החיבור נכשל");
+      setTelegramStatus((prev) => ({ ...(prev || {}), connected: true, botConfigured: true, reminderServiceConfigured: true }));
+      showToast("Telegram מחובר ✓");
+    } catch (error) {
+      showToast(error.message || "החיבור לטלגרם נכשל");
+    } finally {
+      setTelegramBusy(false);
     }
   }
 
@@ -338,6 +431,11 @@ export default function Home() {
               </div>
             </div>
             <div className="sheetNote"><strong>Google Sheets</strong><span>קובץ אחד קבוע ב-Drive. כל שבוע נשמר בו בטאב נפרד, מראשון עד שבת.</span></div>
+            <div className="telegramBox">
+              <div className="telegramTitle"><Icon name="bell" size={18}/><strong>תזכורות Telegram</strong></div>
+              <span>{telegramStatus?.connected ? "מחובר. תזכורות פעילות לאירועים שבחרת." : "שלח /start לבוט שלך ואז לחץ על חיבור."}</span>
+              <button type="button" onClick={connectTelegram} disabled={telegramBusy}>{telegramBusy ? "מחבר..." : telegramStatus?.connected ? "חבר מחדש" : "חבר Telegram"}</button>
+            </div>
             <button className="logoutButton" onClick={() => signOut()}>התנתקות</button>
           </aside>
         </div>
@@ -399,7 +497,7 @@ function EventCard({ event, now, onEdit, onDelete }) {
     <article className={`eventCard tone-${toneFor(event.category)} ${completed ? "eventCompleted" : ""}`}>
       <div className="eventAccent"/>
       <div className="eventTime"><strong>{event.start}</strong><span>{event.end}</span></div>
-      <div className="eventInfo"><div className="eventTitleRow"><h4>{event.title}</h4><span className="categoryPill">{event.category}</span>{completed && <span className="completedPill">הסתיים</span>}</div><p>{event.notes || durationLabel(event.start, event.end)}</p></div>
+      <div className="eventInfo"><div className="eventTitleRow"><h4>{event.title}</h4><span className="categoryPill">{event.category}</span>{completed && <span className="completedPill">הסתיים</span>}</div><p>{event.notes || durationLabel(event.start, event.end)}</p>{event.reminderMinutes ? <div className="reminderMeta"><Icon name="bell" size={13}/><span>{reminderLabel(event.reminderMinutes)}</span></div> : null}</div>
       <div className="eventActions"><button onClick={() => onEdit(event)} aria-label="עריכה"><Icon name="edit" size={18}/></button><button onClick={() => onDelete(event)} aria-label="מחיקה"><Icon name="trash" size={18}/></button></div>
     </article>
   );
@@ -417,6 +515,28 @@ function EventForm({ form, setForm, editing, saving, onSubmit, onCancel }) {
           <label className="field"><span>שעת סיום</span><input type="time" value={form.end} onChange={(e) => update("end", e.target.value)}/></label>
         </div>
         <div className="durationPreview"><Icon name="clock" size={17}/><span>{form.end > form.start ? `משך האירוע: ${durationLabel(form.start, form.end)}` : "שעת הסיום צריכה להיות אחרי ההתחלה"}</span></div>
+      </section>
+
+      <section className="formCard reminderFormCard">
+        <div className="reminderHeader">
+          <div><span className="fieldLabel">תזכורת Telegram</span><small>לקבל הודעה לפני תחילת האירוע</small></div>
+          <button type="button" role="switch" aria-checked={form.reminderEnabled} className={`reminderSwitch ${form.reminderEnabled ? "on" : ""}`} onClick={() => update("reminderEnabled", !form.reminderEnabled)}><i/></button>
+        </div>
+        {form.reminderEnabled && (
+          <div className="reminderSettings">
+            <div className="reminderOptions">
+              {REMINDER_PRESETS.map((preset) => <button type="button" key={preset.minutes} className={form.reminderChoice === String(preset.minutes) ? "selected" : ""} onClick={() => update("reminderChoice", String(preset.minutes))}>{preset.label}</button>)}
+              <button type="button" className={form.reminderChoice === "custom" ? "selected" : ""} onClick={() => update("reminderChoice", "custom")}>מותאם אישית</button>
+            </div>
+            {form.reminderChoice === "custom" && (
+              <div className="customReminder">
+                <label className="field"><span>כמה זמן לפני?</span><input type="number" inputMode="decimal" min="1" value={form.reminderCustomValue} onChange={(e) => update("reminderCustomValue", e.target.value)}/></label>
+                <label className="field"><span>יחידה</span><select value={form.reminderCustomUnit} onChange={(e) => update("reminderCustomUnit", e.target.value)}><option value="minutes">דקות</option><option value="hours">שעות</option><option value="days">ימים</option></select></label>
+              </div>
+            )}
+            <div className="reminderPreview"><Icon name="bell" size={15}/><span>התראה {Number.isNaN(reminderMinutesFromForm(form)) ? "בזמן לא תקין" : reminderLabel(reminderMinutesFromForm(form))}</span></div>
+          </div>
+        )}
       </section>
 
       <section className="formCard">

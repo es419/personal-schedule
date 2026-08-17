@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createEvent, listWeekEvents } from "@/lib/sheets";
+import { reminderServiceConfigured } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,13 @@ function validTimeRange(start, end) {
 function getGoogleAccess(session) {
   if (!session?.accessToken || session.authError) return null;
   return session.accessToken;
+}
+
+function parseReminderMinutes(value) {
+  if (value === null || value === undefined || value === "" || Number(value) <= 0) return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 43200) return NaN;
+  return parsed;
 }
 
 export async function GET(request) {
@@ -49,6 +57,12 @@ export async function POST(request) {
       return Response.json({ error: "Invalid event" }, { status: 400 });
     }
 
+    const reminderMinutes = parseReminderMinutes(body.reminderMinutes);
+    if (Number.isNaN(reminderMinutes)) return Response.json({ error: "Invalid reminder" }, { status: 400 });
+    if (reminderMinutes && !reminderServiceConfigured()) {
+      return Response.json({ error: "Reminder service is not configured" }, { status: 503 });
+    }
+
     const event = {
       id: crypto.randomUUID(),
       title: body.title.trim(),
@@ -57,6 +71,7 @@ export async function POST(request) {
       end: body.end,
       category: body.category || "אישי",
       notes: body.notes?.trim() || "",
+      reminderMinutes,
     };
 
     await createEvent(event, accessToken);

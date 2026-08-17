@@ -1,97 +1,78 @@
-# Deployment checklist — הלו״ז שלי
+# Deployment checklist — הלו״ז שלי + Telegram
 
-## איפה עצרנו
+## Google Cloud
 
-הפרויקט המקומי כבר יכול להיות Git repository. השלב הבא הוא ליצור repository ריק ב-GitHub, לדחוף אליו את הקוד, ואז לייבא אותו ל-Vercel.
-
-## 1. Google Cloud
-
-ודא שבאותו Project פעילים:
+ודא שפעילים:
 - Google Sheets API
 - Google Drive API
 
-ב-Google Auth Platform / Data Access צריך scope:
-- https://www.googleapis.com/auth/drive.file
+OAuth scope של המשתמש:
+- `https://www.googleapis.com/auth/drive.file`
 
-אין צורך ב-Service Account ואין צורך ליצור Google Sheet ידנית.
-
-## 2. GitHub
-
-צור repository חדש בשם `personal-schedule`.
-אל תוסיף README, .gitignore או License דרך GitHub.
-
-בתיקיית הפרויקט ב-PowerShell:
-
-```powershell
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/personal-schedule.git
-git push -u origin main
-```
-
-אם `origin` כבר קיים:
-
-```powershell
-git remote set-url origin https://github.com/YOUR_USERNAME/personal-schedule.git
-git push -u origin main
-```
-
-## 3. Vercel
-
-- Add New -> Project
-- Import את `personal-schedule`
-- Framework אמור להיות מזוהה כ-Next.js
-- Deploy פעם ראשונה כדי לקבל Production URL
-
-## 4. Google OAuth — כתובת Production
-
-אחרי שקיבלת כתובת Vercel, למשל:
-`https://personal-schedule.vercel.app`
-
-ב-OAuth Client מסוג Web application הוסף:
-
-Authorized JavaScript origins:
-- `https://personal-schedule.vercel.app`
-
-Authorized redirect URIs:
-- `https://personal-schedule.vercel.app/api/auth/callback/google`
-
-אפשר להשאיר גם את localhost לפיתוח:
-- `http://localhost:3000`
-- `http://localhost:3000/api/auth/callback/google`
-
-## 5. Environment Variables ב-Vercel
-
-הוסף ל-Production:
+## Vercel — משתנים קיימים
 
 ```env
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
-NEXTAUTH_URL=https://personal-schedule.vercel.app
+NEXTAUTH_URL=https://YOUR-DOMAIN.vercel.app
 NEXTAUTH_SECRET=...
-ALLOWED_EMAIL=your-google-email@example.com
+ALLOWED_EMAIL=...
 ```
 
-ליצירת NEXTAUTH_SECRET ב-PowerShell:
+## Telegram — משתנים חדשים
+
+צור Bot דרך BotFather והוסף:
+
+```env
+TELEGRAM_BOT_TOKEN=...
+CRON_SECRET=...
+GOOGLE_SERVICE_ACCOUNT_EMAIL=...
+GOOGLE_PRIVATE_KEY=...
+```
+
+`CRON_SECRET` אפשר ליצור ב-PowerShell:
 
 ```powershell
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-אחרי הוספת/שינוי Environment Variables בצע Redeploy.
+את `GOOGLE_SERVICE_ACCOUNT_EMAIL` ואת `GOOGLE_PRIVATE_KEY` לוקחים מקובץ ה-JSON של ה-Service Account. אין להעלות את קובץ ה-JSON ל-GitHub.
 
-## 6. בדיקה ראשונה
+לאחר שינוי Environment Variables: Redeploy.
 
-1. פתח את כתובת ה-Vercel.
-2. התחבר עם Google.
-3. אשר את ההרשאה שהאפליקציה מבקשת.
-4. בכניסה הראשונה האפליקציה אמורה ליצור קובץ Google Sheets אחד בשם `הלו״ז שלי`.
-5. הוסף אירוע עם שעת התחלה וסיום.
-6. ודא שהאירוע מופיע בטאב של השבוע הנוכחי.
-7. הוסף אירוע נוסף באותו שבוע — אסור שייווצר קובץ או טאב נוסף.
-8. עבור לשבוע אחר והוסף אירוע — צריך להיווצר רק טאב חדש בתוך אותו קובץ.
+## חיבור Telegram בתוך האפליקציה
 
-## 7. iPhone
+1. פתח את הבוט בטלגרם ושלח `/start`.
+2. פתח באפליקציה את תפריט הצד.
+3. תחת "תזכורות Telegram" לחץ "חבר Telegram".
+4. אמורה להגיע הודעת אישור מהבוט.
 
-לאחר שהכול עובד ב-Safari:
-Share -> Add to Home Screen.
-האייקון כבר כלול בפרויקט והאפליקציה מוגדרת ל-standalone.
+בשלב הזה האפליקציה גם משתפת אוטומטית את קובץ `הלו״ז שלי` עם ה-Service Account, כדי שהבודק ברקע יוכל לקרוא ולסמן תזכורות.
+
+## Cron חיצוני
+
+ב-Vercel Hobby לא משתמשים ב-Vercel Cron של פעם בדקה. הגדר שירות cron חיצוני לבצע GET פעם בדקה אל:
+
+```text
+https://YOUR-DOMAIN.vercel.app/api/cron/reminders
+```
+
+והוסף Header:
+
+```text
+Authorization: Bearer YOUR_CRON_SECRET
+```
+
+תגובה תקינה תיראה בערך כך:
+
+```json
+{"ok":true,"scanned":3,"sent":0,"skipped":0}
+```
+
+## בדיקת תזכורת
+
+1. צור אירוע לעוד 5–10 דקות.
+2. הפעל תזכורת של 5 דקות לפני.
+3. ודא שבכרטיס האירוע מופיעה התזכורת.
+4. כשהזמן מגיע, Telegram אמור לשלוח הודעה אחת בלבד.
+5. ערוך את האירוע לזמן חדש — מצב התזכורת מתאפס אוטומטית וניתן לקבל התראה חדשה.

@@ -1,64 +1,50 @@
 # הלו״ז שלי
 
-אפליקציית לו״ז אישית ב-Next.js עם Google Sheets כ-backend.
+אפליקציית לו״ז אישית ב-Next.js עם Google Sheets כ-backend ותזכורות Telegram.
 
-## איך האחסון עובד
+## אחסון
 
-- האפליקציה משתמשת ב-Google OAuth של המשתמש עם scope מצומצם `drive.file`.
-- בכניסה הראשונה היא מחפשת ב-Google Drive קובץ שהיא עצמה יצרה ומסומן כקובץ האפליקציה.
-- אם הקובץ לא קיים, היא יוצרת פעם אחת קובץ Google Sheets בשם `הלו״ז שלי`.
-- הקובץ מסומן ב-Drive באמצעות `appProperties`, ולכן האפליקציה תמצא אותו גם אם המשתמש ישנה לו את השם.
-- בכל שבוע נוצר טאב חדש בתוך אותו קובץ, למשל `16.08-22.08.2026`.
-- אם הטאב של השבוע כבר קיים, כל אירוע חדש נשמר בו ולא נוצר טאב כפול.
-- בכל טאב יש שבעה אזורים: ראשון עד שבת.
-- לכל יום נשמרים שעת התחלה, שעת סיום, שם אירוע, קטגוריה והערה.
-- עמודת מזהה פנימית מוסתרת ומשמשת לעריכה ומחיקה.
+- קובץ Google Sheets יחיד בשם `הלו״ז שלי` נוצר אוטומטית.
+- כל שבוע נשמר בטאב נפרד, ראשון עד שבת.
+- אירועים כוללים התחלה, סיום, קטגוריה והערה.
+- תזכורות נשמרות בגיליון מוסתר `_תזכורות`, כך שמבנה השבוע הקיים לא משתנה.
+- מזהה ה-Telegram נשמר בגיליון מוסתר `_הגדרות`.
+- אירועים שעברו נשארים בהיסטוריה ומסומנים כ"הסתיים".
+
+## תזכורות Telegram
+
+בכל אירוע אפשר להפעיל תזכורת ולבחור 5/15/30 דקות, שעה, יום או זמן מותאם אישית.
+
+כדי שהתזכורות יעבדו גם כשהאפליקציה סגורה:
+
+1. צור Bot ב-Telegram דרך BotFather וקבל Bot Token.
+2. הגדר ב-Vercel את `TELEGRAM_BOT_TOKEN`.
+3. השתמש ב-Service Account של פרויקט Google והגדר ב-Vercel את `GOOGLE_SERVICE_ACCOUNT_EMAIL` ואת `GOOGLE_PRIVATE_KEY`.
+4. צור `CRON_SECRET` אקראי ושמור גם אותו ב-Vercel.
+5. אחרי ה-Deploy, שלח `/start` לבוט.
+6. באפליקציה: תפריט -> תזכורות Telegram -> חבר Telegram. האפליקציה מזהה את הצ'אט ושומרת אותו בעצמה.
+7. הגדר שירות cron חיצוני שיקרא פעם בדקה ל-`/api/cron/reminders` עם ה-secret.
+
+האפליקציה משתפת אוטומטית רק את קובץ הלו״ז שלה עם ה-Service Account, כ-Writer, כדי שהבדיקה ברקע תוכל לקרוא תזכורות ולסמן אילו כבר נשלחו.
 
 ## Google Cloud
 
-1. הפעל בפרויקט את **Google Sheets API** ואת **Google Drive API**.
-2. הגדר Google Auth Platform / OAuth consent screen.
-3. ב-Data Access הוסף את scope:
-   `https://www.googleapis.com/auth/drive.file`
-4. צור OAuth Client מסוג **Web application**.
-5. לפיתוח מקומי הוסף Redirect URI:
-   `http://localhost:3000/api/auth/callback/google`
-6. לפרודקשן הוסף את כתובת Vercel:
-   `https://YOUR-DOMAIN.vercel.app/api/auth/callback/google`
-7. אם האפליקציה במצב Testing, הוסף את חשבון Google שלך כ-Test user.
+- הפעל Google Sheets API ו-Google Drive API.
+- OAuth scope של המשתמש נשאר `https://www.googleapis.com/auth/drive.file`.
+- אין צורך להגדיר Spreadsheet ID ידנית.
 
-> אין צורך ב-Service Account ואין צורך ליצור Google Sheet ידנית או להגדיר Spreadsheet ID.
-
-## משתני סביבה
-
-העתק את `.env.example` ל-`.env.local` והשלם:
+## Environment Variables
 
 ```env
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=
 NEXTAUTH_SECRET=
 ALLOWED_EMAIL=
+TELEGRAM_BOT_TOKEN=
+CRON_SECRET=
+GOOGLE_SERVICE_ACCOUNT_EMAIL=
+GOOGLE_PRIVATE_KEY=
 ```
 
-ליצירת secret:
-
-```bash
-openssl rand -base64 32
-```
-
-## הרצה
-
-```bash
-npm install
-npm run dev
-```
-
-## Vercel
-
-ב-Vercel הוסף את אותם משתני הסביבה, כאשר `NEXTAUTH_URL` הוא דומיין ה-Production המדויק.
-לאחר שינוי Environment Variables יש לבצע Redeploy.
-
-## Deployment
-
-להעלאה מסודרת ל-GitHub/Vercel ראה `DEPLOY-CHECKLIST.md`.
+אם ה-private key מודבק בשורה אחת, אפשר להשאיר בו `\n`; הקוד ממיר אותם לירידות שורה בזמן ריצה.
