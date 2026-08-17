@@ -148,7 +148,6 @@ function Icon({ name, size = 22 }) {
 export default function Home() {
   const { data: session, status } = useSession();
   const [today, setToday] = useState("");
-  const [now, setNow] = useState(0);
   const [anchor, setAnchor] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [view, setView] = useState("today");
@@ -167,7 +166,6 @@ export default function Home() {
     const currentDate = new Date();
     const current = localISO(currentDate);
     setToday(current);
-    setNow(currentDate.getTime());
     setAnchor(current);
     setSelectedDate(current);
     setForm((prev) => ({ ...prev, date: current }));
@@ -176,7 +174,6 @@ export default function Home() {
 
     const clock = window.setInterval(() => {
       const next = new Date();
-      setNow(next.getTime());
       setToday(localISO(next));
     }, 30000);
 
@@ -374,7 +371,6 @@ export default function Home() {
         {view === "today" && (
           <TodayView
             today={today}
-            now={now}
             events={todayEvents}
             loading={loading}
             onAdd={() => openAdd(today)}
@@ -387,7 +383,6 @@ export default function Home() {
           <WeekView
             dates={dates}
             today={today}
-            now={now}
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
             events={selectedEvents}
@@ -446,7 +441,7 @@ export default function Home() {
   );
 }
 
-function TodayView({ today, now, events, loading, onAdd, onEdit, onDelete }) {
+function TodayView({ today, events, loading, onAdd, onEdit, onDelete }) {
   const date = fromISO(today);
   return (
     <div className="viewStack">
@@ -456,12 +451,12 @@ function TodayView({ today, now, events, loading, onAdd, onEdit, onDelete }) {
         <div className="heroStat"><strong>{totalDuration(events)}</strong><span>שעות מתוזמנות</span></div>
       </section>
       <section className="sectionHeader"><div><h3>הלוח להיום</h3><p>{events.length ? "הכול במקום אחד" : "היום עדיין פתוח"}</p></div><button className="smallAdd" onClick={onAdd}><Icon name="plus" size={18}/>אירוע</button></section>
-      <EventList events={events} now={now} loading={loading} onEdit={onEdit} onDelete={onDelete} emptyText="אין לך אירועים להיום." onAdd={onAdd}/>
+      <EventList events={events} loading={loading} onEdit={onEdit} onDelete={onDelete} emptyText="אין לך אירועים להיום." onAdd={onAdd}/>
     </div>
   );
 }
 
-function WeekView({ dates, today, now, selectedDate, setSelectedDate, events, allEvents, loading, onAdd, onEdit, onDelete }) {
+function WeekView({ dates, today, selectedDate, setSelectedDate, events, allEvents, loading, onAdd, onEdit, onDelete }) {
   return (
     <div className="viewStack">
       <section className="dayStrip">
@@ -480,12 +475,19 @@ function WeekView({ dates, today, now, selectedDate, setSelectedDate, events, al
         <div><span>סה״כ מתוזמן</span><strong>{totalDuration(allEvents)} שעות</strong></div>
       </section>
       <section className="sectionHeader"><div><h3>{DAY_NAMES[fromISO(selectedDate).getDay()]}</h3><p>{fromISO(selectedDate).getDate()} {MONTHS[fromISO(selectedDate).getMonth()]}</p></div><button className="smallAdd" onClick={onAdd}><Icon name="plus" size={18}/>אירוע</button></section>
-      <EventList events={events} now={now} loading={loading} onEdit={onEdit} onDelete={onDelete} emptyText="אין אירועים ביום הזה." onAdd={onAdd}/>
+      <EventList events={events} loading={loading} onEdit={onEdit} onDelete={onDelete} emptyText="אין אירועים ביום הזה." onAdd={onAdd}/>
     </div>
   );
 }
 
-function EventList({ events, now, loading, onEdit, onDelete, emptyText, onAdd }) {
+function EventList({ events, loading, onEdit, onDelete, emptyText, onAdd }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const clock = window.setInterval(() => setNow(Date.now()), 30000);
+    return () => window.clearInterval(clock);
+  }, []);
+
   if (loading) return <div className="loadingList"><div/><div/><div/></div>;
   if (!events.length) return <div className="emptyState"><div className="emptyIcon"><Icon name="clock" size={28}/></div><strong>{emptyText}</strong><span>אפשר להשאיר אותו פנוי או להוסיף משהו.</span><button onClick={onAdd}>הוסף אירוע</button></div>;
   return <div className="eventList">{events.map((event) => <EventCard key={event.id} event={event} now={now} onEdit={onEdit} onDelete={onDelete}/>)}</div>;
