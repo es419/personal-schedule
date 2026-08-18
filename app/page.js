@@ -172,6 +172,10 @@ export default function Home() {
   const [telegramStatus, setTelegramStatus] = useState(null);
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [form, setForm] = useState(emptyEventForm());
+  const [pullDistance, setPullDistance] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const appShellRef = useRef(null);
+  const refreshingRef = useRef(false);
 
   useEffect(() => {
     const currentDate = new Date();
@@ -207,17 +211,49 @@ export default function Home() {
   }, [menuOpen, session]);
 
   async function loadWeek(date = anchor, { silent = false } = {}) {
-    if (!date || !session) return;
+    if (!date || !session) return false;
     if (!silent) setLoading(true);
     try {
       const response = await fetch(`/api/events?week=${encodeURIComponent(date)}`, { cache: "no-store" });
       if (!response.ok) throw new Error("load");
       const data = await response.json();
       setEvents(data.events || []);
+      return true;
     } catch {
       if (!silent) showToast("לא הצלחתי לטעון את השבוע");
+      return false;
     } finally {
       if (!silent) setLoading(false);
+    }
+  }
+
+  async function refreshAllData() {
+    if (!session || !anchor || refreshingRef.current) return;
+    refreshingRef.current = true;
+    setRefreshing(true);
+    setPullDistance(72);
+
+    try {
+      const current = localISO(new Date());
+      setToday(current);
+
+      const [weekOk, telegramResponse] = await Promise.all([
+        loadWeek(anchor, { silent: true }),
+        fetch("/api/telegram/connect", { cache: "no-store" }).catch(() => null),
+      ]);
+
+      if (telegramResponse?.ok) {
+        const telegramData = await telegramResponse.json().catch(() => null);
+        if (telegramData) setTelegramStatus(telegramData);
+      }
+
+      showToast(weekOk ? "הנתונים עודכנו" : "לא הצלחתי לרענן את הנתונים");
+    } finally {
+      window.setTimeout(() => {
+        refreshingRef.current = false;
+        setRefreshing(false);
+        setPullDistance(0);
+      }, 220);
     }
   }
 
@@ -244,6 +280,83 @@ export default function Home() {
       document.removeEventListener("visibilitychange", syncOnReturn);
     };
   }, [session, anchor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const root = appShellRef.current;
+    if (!root || !session) return;
+
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+    let pulling = false;
+    let currentDistance = 0;
+
+    const resetGesture = () => {
+      tracking = false;
+      pulling = false;
+      currentDistance = 0;
+    };
+
+    const handleTouchStart = (event) => {
+      if (refreshingRef.current || menuOpen || event.touches.length !== 1 || window.scrollY > 1) return;
+      const touch = event.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      tracking = true;
+      pulling = false;
+      currentDistance = 0;
+    };
+
+    const handleTouchMove = (event) => {
+      if (!tracking || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+
+      if (!pulling) {
+        if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+          resetGesture();
+          return;
+        }
+        if (dy <= 6 || Math.abs(dy) <= Math.abs(dx)) return;
+        if (window.scrollY > 1) {
+          resetGesture();
+          return;
+        }
+        pulling = true;
+      }
+
+      if (dy <= 0) {
+        resetGesture();
+        setPullDistance(0);
+        return;
+      }
+
+      event.preventDefault();
+      currentDistance = Math.min(104, dy * 0.55);
+      setPullDistance(currentDistance);
+    };
+
+    const finishPull = () => {
+      if (!tracking && !pulling) return;
+      const shouldRefresh = pulling && currentDistance >= 72;
+      resetGesture();
+      if (shouldRefresh) refreshAllData();
+      else setPullDistance(0);
+    };
+
+    root.addEventListener("touchstart", handleTouchStart, { passive: true });
+    root.addEventListener("touchmove", handleTouchMove, { passive: false });
+    root.addEventListener("touchend", finishPull, { passive: true });
+    root.addEventListener("touchcancel", finishPull, { passive: true });
+
+    return () => {
+      root.removeEventListener("touchstart", handleTouchStart);
+      root.removeEventListener("touchmove", handleTouchMove);
+      root.removeEventListener("touchend", finishPull);
+      root.removeEventListener("touchcancel", finishPull);
+    };
+  }, [session, anchor, menuOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function showToast(message) {
     setToast(message);
@@ -374,8 +487,19 @@ export default function Home() {
     );
   }
 
+  const pullIndicatorY = refreshing ? 0 : Math.min(0, -58 + pullDistance * 0.82);
+  const pullProgress = Math.min(1, pullDistance / 72);
+
   return (
-    <main className="appShell">
+    <main className="appShell" ref={appShellRef}>
+      <div
+        className={`pullRefreshIndicator ${refreshing ? "refreshing" : ""} ${pullDistance >= 72 ? "ready" : ""}`}
+        style={{ transform: `translate(-50%, ${pullIndicatorY}px)`, opacity: refreshing ? 1 : pullProgress, "--pull-rotation": Math.round(pullProgress * 220) }}
+        aria-live="polite"
+      >
+        <span className="pullRefreshGlyph">↻</span>
+        <span>{refreshing ? "מרענן..." : pullDistance >= 72 ? "שחרר לרענון" : "משוך לרענון"}</span>
+      </div>
       <header className="topBar">
         <button className="iconButton" onClick={() => setMenuOpen(true)} aria-label="פתיחת תפריט"><Icon name="menu"/></button>
         <div className="titleWrap">

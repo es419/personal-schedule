@@ -207,3 +207,33 @@ button { cursor: pointer; }
 .selectedReminders { display: flex; flex-wrap: wrap; gap: 7px; }
 .selectedReminders button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); border-radius: 999px; padding: 7px 9px; font-size: 11px; font-weight: 700; }
 .selectedReminders button b { color: var(--muted); font-size: 15px; line-height: 1; }
+
+
+/* Pull to refresh */
+html, body { overscroll-behavior-y: contain; }
+.pullRefreshIndicator {
+  position: fixed;
+  z-index: 19;
+  top: calc(max(14px, env(safe-area-inset-top)) + 58px);
+  left: 50%;
+  min-height: 34px;
+  padding: 7px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: 0 8px 22px rgba(0,0,0,.10);
+  font-size: 11px;
+  font-weight: 800;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition: transform .16s ease, opacity .14s ease;
+}
+.pullRefreshIndicator.ready { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 38%, var(--line)); }
+.pullRefreshGlyph { display: inline-block; font-size: 17px; line-height: 1; transform: rotate(calc(var(--pull-rotation, 0) * 1deg)); }
+.pullRefreshIndicator.refreshing .pullRefreshGlyph { animation: pullRefreshSpin .8s linear infinite; }
+@keyframes pullRefreshSpin { to { transform: rotate(360deg); } }
