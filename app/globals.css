@@ -109,8 +109,10 @@ button { cursor: pointer; }
 .eventCard.eventCompleted .eventActions { opacity: .72; }
 .completedPill { flex: none; font-size: 10px; color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--danger) 24%, var(--line)); padding: 3px 7px; border-radius: 20px; font-weight: 700; }
 
-.dayStrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 8px; }
-.dayStrip button { border: 0; background: transparent; border-radius: 14px; padding: 8px 2px 7px; display: grid; justify-items: center; gap: 3px; min-width: 0; }
+.dayStripViewport { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; touch-action: pan-y; }
+.dayStrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; padding: 8px; will-change: transform, opacity; }
+.dayStrip.swipeAnimating { transition: transform .18s cubic-bezier(.22,.7,.25,1), opacity .16s ease; }
+.dayStrip button { border: 0; background: transparent; border-radius: 14px; padding: 8px 2px 7px; display: grid; justify-items: center; gap: 3px; min-width: 0; user-select: none; -webkit-user-select: none; }
 .dayStrip button span { font-size: 11px; color: var(--muted); }
 .dayStrip button strong { font-size: 15px; }
 .dayStrip button i { width: 4px; height: 4px; border-radius: 50%; background: transparent; }
@@ -198,3 +200,9 @@ button { cursor: pointer; }
 @media (max-width: 390px) {
   .reminderOptions { grid-template-columns: repeat(2, 1fr); }
 }
+.reminderHint { font-size: 11px; color: var(--muted); }
+.customReminder { align-items: end; }
+.addReminderButton { grid-column: 1 / -1; min-height: 40px; border: 1px dashed var(--primary); background: var(--primary-soft); color: var(--primary); border-radius: 11px; font-size: 12px; font-weight: 800; }
+.selectedReminders { display: flex; flex-wrap: wrap; gap: 7px; }
+.selectedReminders button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); border-radius: 999px; padding: 7px 9px; font-size: 11px; font-weight: 700; }
+.selectedReminders button b { color: var(--muted); font-size: 15px; line-height: 1; }

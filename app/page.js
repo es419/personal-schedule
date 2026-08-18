@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
 
 const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -25,27 +25,38 @@ const REMINDER_PRESETS = [
 function emptyEventForm(date = "") {
   return {
     title: "", date, start: "09:00", end: "10:00", category: "אישי", notes: "",
-    reminderEnabled: false, reminderChoice: "15", reminderCustomValue: "30", reminderCustomUnit: "minutes",
+    reminderEnabled: false, reminderMinutesList: [], reminderCustomValue: "30", reminderCustomUnit: "minutes",
   };
 }
 
-function reminderFormState(minutesBefore) {
-  const value = Number(minutesBefore);
-  if (!Number.isFinite(value) || value <= 0) return { reminderEnabled: false, reminderChoice: "15", reminderCustomValue: "30", reminderCustomUnit: "minutes" };
-  if (REMINDER_PRESETS.some((preset) => preset.minutes === value)) {
-    return { reminderEnabled: true, reminderChoice: String(value), reminderCustomValue: "30", reminderCustomUnit: "minutes" };
-  }
-  if (value % 1440 === 0) return { reminderEnabled: true, reminderChoice: "custom", reminderCustomValue: String(value / 1440), reminderCustomUnit: "days" };
-  if (value % 60 === 0) return { reminderEnabled: true, reminderChoice: "custom", reminderCustomValue: String(value / 60), reminderCustomUnit: "hours" };
-  return { reminderEnabled: true, reminderChoice: "custom", reminderCustomValue: String(value), reminderCustomUnit: "minutes" };
+function normalizeReminderMinutesList(values) {
+  const source = Array.isArray(values) ? values : values ? [values] : [];
+  return [...new Set(source.map(Number).filter((value) => Number.isInteger(value) && value > 0 && value <= 43200))]
+    .sort((a, b) => b - a);
 }
 
-function reminderMinutesFromForm(form) {
-  if (!form.reminderEnabled) return null;
-  if (form.reminderChoice !== "custom") return Number(form.reminderChoice);
+function reminderFormState(minutesList, fallbackMinutes) {
+  const reminders = normalizeReminderMinutesList(
+    Array.isArray(minutesList) && minutesList.length ? minutesList : fallbackMinutes
+  );
+  return {
+    reminderEnabled: reminders.length > 0,
+    reminderMinutesList: reminders,
+    reminderCustomValue: "30",
+    reminderCustomUnit: "minutes",
+  };
+}
+
+function reminderMinutesListFromForm(form) {
+  if (!form.reminderEnabled) return [];
+  return normalizeReminderMinutesList(form.reminderMinutesList);
+}
+
+function customReminderMinutesFromForm(form) {
   const value = Number(form.reminderCustomValue);
   const multiplier = form.reminderCustomUnit === "days" ? 1440 : form.reminderCustomUnit === "hours" ? 60 : 1;
-  return Number.isFinite(value) && value > 0 ? Math.round(value * multiplier) : NaN;
+  const minutes = Math.round(value * multiplier);
+  return Number.isFinite(value) && value > 0 && minutes <= 43200 ? minutes : NaN;
 }
 
 function reminderLabel(minutesBefore) {
@@ -195,23 +206,43 @@ export default function Home() {
     return () => { cancelled = true; };
   }, [menuOpen, session]);
 
-  async function loadWeek(date = anchor) {
+  async function loadWeek(date = anchor, { silent = false } = {}) {
     if (!date || !session) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const response = await fetch(`/api/events?week=${encodeURIComponent(date)}`, { cache: "no-store" });
       if (!response.ok) throw new Error("load");
       const data = await response.json();
       setEvents(data.events || []);
     } catch {
-      showToast("לא הצלחתי לטעון את השבוע");
+      if (!silent) showToast("לא הצלחתי לטעון את השבוע");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
   useEffect(() => {
     if (session && anchor) loadWeek(anchor);
+  }, [session, anchor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!session || !anchor) return;
+    let lastSyncAt = Date.now();
+
+    const syncOnReturn = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastSyncAt < 1500) return;
+      lastSyncAt = now;
+      loadWeek(anchor, { silent: true });
+    };
+
+    window.addEventListener("focus", syncOnReturn);
+    document.addEventListener("visibilitychange", syncOnReturn);
+    return () => {
+      window.removeEventListener("focus", syncOnReturn);
+      document.removeEventListener("visibilitychange", syncOnReturn);
+    };
   }, [session, anchor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function showToast(message) {
@@ -253,7 +284,7 @@ export default function Home() {
       end: event.end,
       category: event.category,
       notes: event.notes || "",
-      ...reminderFormState(event.reminderMinutes),
+      ...reminderFormState(event.reminderMinutesList, event.reminderMinutes),
     });
     setView("add");
   }
@@ -262,10 +293,7 @@ export default function Home() {
     event.preventDefault();
     if (!form.title.trim()) return showToast("צריך לתת שם לאירוע");
     if (form.end <= form.start) return showToast("שעת הסיום צריכה להיות אחרי ההתחלה");
-    const reminderMinutes = reminderMinutesFromForm(form);
-    if (Number.isNaN(reminderMinutes) || (reminderMinutes && reminderMinutes > 43200)) {
-      return showToast("זמן התזכורת לא תקין");
-    }
+    const reminderMinutesList = reminderMinutesListFromForm(form);
     const payload = {
       title: form.title,
       date: form.date,
@@ -273,7 +301,7 @@ export default function Home() {
       end: form.end,
       category: form.category,
       notes: form.notes,
-      reminderMinutes,
+      reminderMinutesList,
     };
     setSaving(true);
     try {
@@ -391,6 +419,7 @@ export default function Home() {
             onAdd={() => openAdd(selectedDate)}
             onEdit={openEdit}
             onDelete={removeEvent}
+            onNavigateWeek={navigateWeek}
           />
         )}
 
@@ -456,19 +485,114 @@ function TodayView({ today, events, loading, onAdd, onEdit, onDelete }) {
   );
 }
 
-function WeekView({ dates, today, selectedDate, setSelectedDate, events, allEvents, loading, onAdd, onEdit, onDelete }) {
+function WeekView({ dates, today, selectedDate, setSelectedDate, events, allEvents, loading, onAdd, onEdit, onDelete, onNavigateWeek }) {
+  const swipeStart = useRef(null);
+  const swipeTimer = useRef(null);
+  const suppressDayClick = useRef(false);
+  const [stripOffset, setStripOffset] = useState(0);
+  const [stripOpacity, setStripOpacity] = useState(1);
+  const [stripAnimating, setStripAnimating] = useState(false);
+
+  useEffect(() => () => window.clearTimeout(swipeTimer.current), []);
+
+  function handleSwipeStart(event) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    window.clearTimeout(swipeTimer.current);
+    swipeStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId, dragging: false };
+    suppressDayClick.current = false;
+    setStripAnimating(false);
+  }
+
+  function handleSwipeMove(event) {
+    const start = swipeStart.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+
+    if (!start.dragging) {
+      if (Math.abs(dx) < 7 && Math.abs(dy) < 7) return;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        swipeStart.current = null;
+        setStripOffset(0);
+        return;
+      }
+      start.dragging = true;
+      suppressDayClick.current = true;
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    }
+
+    setStripOffset(Math.max(-110, Math.min(110, dx)));
+    setStripOpacity(Math.max(0.72, 1 - Math.abs(dx) / 420));
+  }
+
+  function finishSwipe(event, cancelled = false) {
+    const start = swipeStart.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const dx = event.clientX - start.x;
+    const shouldNavigate = !cancelled && start.dragging && Math.abs(dx) >= 45;
+    swipeStart.current = null;
+    setStripAnimating(true);
+
+    if (!shouldNavigate) {
+      setStripOffset(0);
+      setStripOpacity(1);
+      swipeTimer.current = window.setTimeout(() => { suppressDayClick.current = false; }, 180);
+      return;
+    }
+
+    // לפי הכיוון שביקשת: ימינה = השבוע הבא, שמאלה = השבוע הקודם.
+    const direction = dx > 0 ? 1 : -1;
+    const exitOffset = dx > 0 ? 82 : -82;
+    const enterOffset = dx > 0 ? -82 : 82;
+    setStripOffset(exitOffset);
+    setStripOpacity(0.15);
+
+    swipeTimer.current = window.setTimeout(() => {
+      onNavigateWeek(direction);
+      setStripAnimating(false);
+      setStripOffset(enterOffset);
+      setStripOpacity(0.15);
+
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          setStripAnimating(true);
+          setStripOffset(0);
+          setStripOpacity(1);
+          swipeTimer.current = window.setTimeout(() => { suppressDayClick.current = false; }, 220);
+        });
+      });
+    }, 150);
+  }
+
   return (
     <div className="viewStack">
-      <section className="dayStrip">
-        {dates.map((date, index) => {
-          const iso = localISO(date);
-          const count = allEvents.filter((event) => event.date === iso).length;
-          return (
-            <button key={iso} className={`${selectedDate === iso ? "selected" : ""} ${today === iso ? "today" : ""}`} onClick={() => setSelectedDate(iso)}>
-              <span>{DAY_SHORT[index]}</span><strong>{date.getDate()}</strong><i className={count ? "hasEvents" : ""}/>
-            </button>
-          );
-        })}
+      <section
+        className="dayStripViewport"
+        onPointerDown={handleSwipeStart}
+        onPointerMove={handleSwipeMove}
+        onPointerUp={(event) => finishSwipe(event)}
+        onPointerCancel={(event) => finishSwipe(event, true)}
+        onClickCapture={(event) => {
+          if (suppressDayClick.current) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
+      >
+        <div
+          className={`dayStrip ${stripAnimating ? "swipeAnimating" : ""}`}
+          style={{ transform: `translate3d(${stripOffset}px, 0, 0)`, opacity: stripOpacity }}
+        >
+          {dates.map((date, index) => {
+            const iso = localISO(date);
+            const count = allEvents.filter((event) => event.date === iso).length;
+            return (
+              <button key={iso} className={`${selectedDate === iso ? "selected" : ""} ${today === iso ? "today" : ""}`} onClick={() => setSelectedDate(iso)}>
+                <span>{DAY_SHORT[index]}</span><strong>{date.getDate()}</strong><i className={count ? "hasEvents" : ""}/>
+              </button>
+            );
+          })}
+        </div>
       </section>
       <section className="weekSummary">
         <div><span>השבוע</span><strong>{allEvents.length} אירועים</strong></div>
@@ -499,7 +623,7 @@ function EventCard({ event, now, onEdit, onDelete }) {
     <article className={`eventCard tone-${toneFor(event.category)} ${completed ? "eventCompleted" : ""}`}>
       <div className="eventAccent"/>
       <div className="eventTime"><strong>{event.start}</strong><span>{event.end}</span></div>
-      <div className="eventInfo"><div className="eventTitleRow"><h4>{event.title}</h4><span className="categoryPill">{event.category}</span>{completed && <span className="completedPill">הסתיים</span>}</div><p>{event.notes || durationLabel(event.start, event.end)}</p>{event.reminderMinutes ? <div className="reminderMeta"><Icon name="bell" size={13}/><span>{reminderLabel(event.reminderMinutes)}</span></div> : null}</div>
+      <div className="eventInfo"><div className="eventTitleRow"><h4>{event.title}</h4><span className="categoryPill">{event.category}</span>{completed && <span className="completedPill">הסתיים</span>}</div><p>{event.notes || durationLabel(event.start, event.end)}</p>{(event.reminderMinutesList?.length || event.reminderMinutes) ? <div className="reminderMeta"><Icon name="bell" size={13}/><span>{normalizeReminderMinutesList(event.reminderMinutesList?.length ? event.reminderMinutesList : event.reminderMinutes).map(reminderLabel).join(" · ")}</span></div> : null}</div>
       <div className="eventActions"><button onClick={() => onEdit(event)} aria-label="עריכה"><Icon name="edit" size={18}/></button><button onClick={() => onDelete(event)} aria-label="מחיקה"><Icon name="trash" size={18}/></button></div>
     </article>
   );
@@ -522,21 +646,31 @@ function EventForm({ form, setForm, editing, saving, onSubmit, onCancel }) {
       <section className="formCard reminderFormCard">
         <div className="reminderHeader">
           <div><span className="fieldLabel">תזכורת Telegram</span><small>לקבל הודעה לפני תחילת האירוע</small></div>
-          <button type="button" role="switch" aria-checked={form.reminderEnabled} className={`reminderSwitch ${form.reminderEnabled ? "on" : ""}`} onClick={() => update("reminderEnabled", !form.reminderEnabled)}><i/></button>
+          <button type="button" role="switch" aria-checked={form.reminderEnabled} className={`reminderSwitch ${form.reminderEnabled ? "on" : ""}`} onClick={() => setForm((prev) => ({ ...prev, reminderEnabled: !prev.reminderEnabled, reminderMinutesList: !prev.reminderEnabled && prev.reminderMinutesList.length === 0 ? [15] : prev.reminderMinutesList }))}><i/></button>
         </div>
         {form.reminderEnabled && (
           <div className="reminderSettings">
+            <div className="reminderHint">אפשר לבחור כמה תזכורות לאותו אירוע</div>
             <div className="reminderOptions">
-              {REMINDER_PRESETS.map((preset) => <button type="button" key={preset.minutes} className={form.reminderChoice === String(preset.minutes) ? "selected" : ""} onClick={() => update("reminderChoice", String(preset.minutes))}>{preset.label}</button>)}
-              <button type="button" className={form.reminderChoice === "custom" ? "selected" : ""} onClick={() => update("reminderChoice", "custom")}>מותאם אישית</button>
+              {REMINDER_PRESETS.map((preset) => {
+                const selected = form.reminderMinutesList.includes(preset.minutes);
+                return <button type="button" key={preset.minutes} className={selected ? "selected" : ""} onClick={() => setForm((prev) => ({ ...prev, reminderMinutesList: selected ? prev.reminderMinutesList.filter((value) => value !== preset.minutes) : normalizeReminderMinutesList([...prev.reminderMinutesList, preset.minutes]) }))}>{preset.label}</button>;
+              })}
             </div>
-            {form.reminderChoice === "custom" && (
-              <div className="customReminder">
-                <label className="field"><span>כמה זמן לפני?</span><input type="number" inputMode="decimal" min="1" value={form.reminderCustomValue} onChange={(e) => update("reminderCustomValue", e.target.value)}/></label>
-                <label className="field"><span>יחידה</span><select value={form.reminderCustomUnit} onChange={(e) => update("reminderCustomUnit", e.target.value)}><option value="minutes">דקות</option><option value="hours">שעות</option><option value="days">ימים</option></select></label>
+            <div className="customReminder">
+              <label className="field"><span>תזכורת מותאמת</span><input type="number" inputMode="decimal" min="1" value={form.reminderCustomValue} onChange={(e) => update("reminderCustomValue", e.target.value)}/></label>
+              <label className="field"><span>יחידה</span><select value={form.reminderCustomUnit} onChange={(e) => update("reminderCustomUnit", e.target.value)}><option value="minutes">דקות</option><option value="hours">שעות</option><option value="days">ימים</option></select></label>
+              <button type="button" className="addReminderButton" onClick={() => {
+                const minutes = customReminderMinutesFromForm(form);
+                if (Number.isNaN(minutes)) return;
+                setForm((prev) => ({ ...prev, reminderMinutesList: normalizeReminderMinutesList([...prev.reminderMinutesList, minutes]) }));
+              }}>+ הוסף תזכורת</button>
+            </div>
+            {form.reminderMinutesList.length > 0 ? (
+              <div className="selectedReminders">
+                {form.reminderMinutesList.map((minutes) => <button type="button" key={minutes} onClick={() => setForm((prev) => ({ ...prev, reminderMinutesList: prev.reminderMinutesList.filter((value) => value !== minutes) }))}><Icon name="bell" size={14}/><span>{reminderLabel(minutes)}</span><b>×</b></button>)}
               </div>
-            )}
-            <div className="reminderPreview"><Icon name="bell" size={15}/><span>התראה {Number.isNaN(reminderMinutesFromForm(form)) ? "בזמן לא תקין" : reminderLabel(reminderMinutesFromForm(form))}</span></div>
+            ) : <div className="reminderPreview"><Icon name="bell" size={15}/><span>עדיין לא נבחרה תזכורת</span></div>}
           </div>
         )}
       </section>

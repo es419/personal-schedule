@@ -20,11 +20,11 @@ function getGoogleAccess(session) {
   return session.accessToken;
 }
 
-function parseReminderMinutes(value) {
-  if (value === null || value === undefined || value === "" || Number(value) <= 0) return null;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 43200) return NaN;
-  return parsed;
+function parseReminderMinutesList(value) {
+  const source = Array.isArray(value) ? value : (value === null || value === undefined || value === "" ? [] : [value]);
+  const parsed = source.map(Number);
+  if (parsed.some((item) => !Number.isInteger(item) || item < 1 || item > 43200)) return null;
+  return [...new Set(parsed)].sort((a, b) => b - a);
 }
 
 export async function PATCH(request, { params }) {
@@ -40,9 +40,9 @@ export async function PATCH(request, { params }) {
       return Response.json({ error: "Invalid event" }, { status: 400 });
     }
 
-    const reminderMinutes = parseReminderMinutes(body.reminderMinutes);
-    if (Number.isNaN(reminderMinutes)) return Response.json({ error: "Invalid reminder" }, { status: 400 });
-    if (reminderMinutes && !reminderServiceConfigured()) {
+    const reminderMinutesList = parseReminderMinutesList(body.reminderMinutesList ?? body.reminderMinutes);
+    if (!reminderMinutesList) return Response.json({ error: "Invalid reminder" }, { status: 400 });
+    if (reminderMinutesList.length && !reminderServiceConfigured()) {
       return Response.json({ error: "Reminder service is not configured" }, { status: 503 });
     }
 
@@ -54,7 +54,8 @@ export async function PATCH(request, { params }) {
       end: body.end,
       category: body.category || "אישי",
       notes: body.notes?.trim() || "",
-      reminderMinutes,
+      reminderMinutesList,
+      reminderMinutes: reminderMinutesList[0] || null,
     };
 
     const updated = await updateEvent(id, body.previousDate, event, accessToken);
