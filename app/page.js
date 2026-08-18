@@ -630,6 +630,7 @@ function EventCard({ event, now, onEdit, onDelete }) {
 }
 
 function EventForm({ form, setForm, editing, saving, onSubmit, onCancel }) {
+  const [customReminderOpen, setCustomReminderOpen] = useState(false);
   function update(key, value) { setForm((prev) => ({ ...prev, [key]: value })); }
   return (
     <form className="eventForm" onSubmit={onSubmit}>
@@ -657,15 +658,25 @@ function EventForm({ form, setForm, editing, saving, onSubmit, onCancel }) {
                 return <button type="button" key={preset.minutes} className={selected ? "selected" : ""} onClick={() => setForm((prev) => ({ ...prev, reminderMinutesList: selected ? prev.reminderMinutesList.filter((value) => value !== preset.minutes) : normalizeReminderMinutesList([...prev.reminderMinutesList, preset.minutes]) }))}>{preset.label}</button>;
               })}
             </div>
-            <div className="customReminder">
-              <label className="field"><span>תזכורת מותאמת</span><input type="number" inputMode="decimal" min="1" value={form.reminderCustomValue} onChange={(e) => update("reminderCustomValue", e.target.value)}/></label>
-              <label className="field"><span>יחידה</span><select value={form.reminderCustomUnit} onChange={(e) => update("reminderCustomUnit", e.target.value)}><option value="minutes">דקות</option><option value="hours">שעות</option><option value="days">ימים</option></select></label>
-              <button type="button" className="addReminderButton" onClick={() => {
-                const minutes = customReminderMinutesFromForm(form);
-                if (Number.isNaN(minutes)) return;
-                setForm((prev) => ({ ...prev, reminderMinutesList: normalizeReminderMinutesList([...prev.reminderMinutesList, minutes]) }));
-              }}>+ הוסף תזכורת</button>
-            </div>
+            <button
+              type="button"
+              className={`customReminderToggle ${customReminderOpen ? "open" : ""}`}
+              aria-expanded={customReminderOpen}
+              onClick={() => setCustomReminderOpen((open) => !open)}
+            >
+              מותאמת אישית
+            </button>
+            {customReminderOpen && (
+              <div className="customReminder">
+                <label className="field"><span>זמן לפני האירוע</span><input type="number" inputMode="decimal" min="1" value={form.reminderCustomValue} onChange={(e) => update("reminderCustomValue", e.target.value)}/></label>
+                <label className="field"><span>יחידה</span><select value={form.reminderCustomUnit} onChange={(e) => update("reminderCustomUnit", e.target.value)}><option value="minutes">דקות</option><option value="hours">שעות</option><option value="days">ימים</option></select></label>
+                <button type="button" className="addReminderButton" onClick={() => {
+                  const minutes = customReminderMinutesFromForm(form);
+                  if (Number.isNaN(minutes)) return;
+                  setForm((prev) => ({ ...prev, reminderMinutesList: normalizeReminderMinutesList([...prev.reminderMinutesList, minutes]) }));
+                }}>+ הוסף תזכורת</button>
+              </div>
+            )}
             {form.reminderMinutesList.length > 0 ? (
               <div className="selectedReminders">
                 {form.reminderMinutesList.map((minutes) => <button type="button" key={minutes} onClick={() => setForm((prev) => ({ ...prev, reminderMinutesList: prev.reminderMinutesList.filter((value) => value !== minutes) }))}><Icon name="bell" size={14}/><span>{reminderLabel(minutes)}</span><b>×</b></button>)}
