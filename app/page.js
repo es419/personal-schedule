@@ -657,15 +657,15 @@ function EventForm({ form, setForm, editing, saving, onSubmit, onCancel }) {
                 const selected = form.reminderMinutesList.includes(preset.minutes);
                 return <button type="button" key={preset.minutes} className={selected ? "selected" : ""} onClick={() => setForm((prev) => ({ ...prev, reminderMinutesList: selected ? prev.reminderMinutesList.filter((value) => value !== preset.minutes) : normalizeReminderMinutesList([...prev.reminderMinutesList, preset.minutes]) }))}>{preset.label}</button>;
               })}
+              <button
+                type="button"
+                className={customReminderOpen ? "selected" : ""}
+                aria-expanded={customReminderOpen}
+                onClick={() => setCustomReminderOpen((open) => !open)}
+              >
+                מותאמת אישית
+              </button>
             </div>
-            <button
-              type="button"
-              className={`customReminderToggle ${customReminderOpen ? "open" : ""}`}
-              aria-expanded={customReminderOpen}
-              onClick={() => setCustomReminderOpen((open) => !open)}
-            >
-              מותאמת אישית
-            </button>
             {customReminderOpen && (
               <div className="customReminder">
                 <label className="field"><span>זמן לפני האירוע</span><input type="number" inputMode="decimal" min="1" value={form.reminderCustomValue} onChange={(e) => update("reminderCustomValue", e.target.value)}/></label>

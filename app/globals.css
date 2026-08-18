@@ -186,8 +186,6 @@ button { cursor: pointer; }
 .reminderOptions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
 .reminderOptions button { min-height: 39px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); border-radius: 11px; font-size: 11px; font-weight: 700; padding: 7px 5px; }
 .reminderOptions button.selected { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
-.customReminderToggle { min-height: 42px; width: 100%; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); border-radius: 11px; font-size: 12px; font-weight: 800; transition: border-color .18s ease, background .18s ease, color .18s ease; }
-.customReminderToggle.open { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
 .customReminder { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; animation: customReminderReveal .18s ease; }
 @keyframes customReminderReveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .field select { width: 100%; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); outline: none; border-radius: 13px; padding: 12px 13px; min-height: 46px; font: inherit; }
