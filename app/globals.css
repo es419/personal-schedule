@@ -712,3 +712,83 @@ html, body {
     font-size: 11px;
   }
 }
+
+
+/* ===== v62 – Telegram-style floating bottom nav ===== */
+.bottomNav {
+  width: min(calc(100% - 28px), 350px);
+  bottom: max(12px, env(safe-area-inset-bottom));
+  padding: 6px;
+  gap: 4px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255,255,255,.52), rgba(242,247,255,.34));
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 22px 48px rgba(16,31,60,.18), 0 8px 18px rgba(16,31,60,.08), inset 0 1px 0 rgba(255,255,255,.32);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.bottomNav button {
+  min-height: 50px;
+  border-radius: 17px;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  transition: color .18s ease, transform .16s cubic-bezier(.2,.8,.2,1), background-color .18s ease, box-shadow .18s ease;
+}
+
+.bottomNav button.active {
+  background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(220,232,255,.18));
+  color: #1f56c6;
+  box-shadow: 0 8px 18px rgba(15,26,44,.12), inset 0 1px 0 rgba(255,255,255,.18);
+  transform: translateY(-1px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .bottomNav {
+    background: linear-gradient(180deg, rgba(20,28,40,.88), rgba(18,24,35,.74));
+    border-color: rgba(255,255,255,.08);
+    box-shadow: 0 26px 54px rgba(0,0,0,.40), 0 8px 18px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.06);
+  }
+
+  :root:not([data-theme="light"]) .bottomNav button {
+    color: #9aa9bf;
+  }
+
+  :root:not([data-theme="light"]) .bottomNav button.active {
+    background: linear-gradient(180deg, rgba(61,101,180,.34), rgba(41,76,142,.24));
+    color: #8ab4ff;
+    box-shadow: 0 8px 18px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+}
+
+:root[data-theme="dark"] .bottomNav {
+  background: linear-gradient(180deg, rgba(20,28,40,.88), rgba(18,24,35,.74));
+  border-color: rgba(255,255,255,.08);
+  box-shadow: 0 26px 54px rgba(0,0,0,.40), 0 8px 18px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+:root[data-theme="dark"] .bottomNav button {
+  color: #9aa9bf;
+}
+
+:root[data-theme="dark"] .bottomNav button.active {
+  background: linear-gradient(180deg, rgba(61,101,180,.34), rgba(41,76,142,.24));
+  color: #8ab4ff;
+  box-shadow: 0 8px 18px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+@media (max-width: 540px) {
+  .bottomNav {
+    width: calc(100% - 20px);
+    border-radius: 22px;
+    padding: 5px;
+  }
+
+  .bottomNav button {
+    min-height: 46px;
+    border-radius: 16px;
+  }
+}
