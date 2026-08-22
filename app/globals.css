@@ -792,3 +792,123 @@ html, body {
     border-radius: 16px;
   }
 }
+
+
+/* ===== v63 – Telegram / WhatsApp compact nav + iOS form containment ===== */
+.bottomNav {
+  width: min(calc(100% - 18px), 330px);
+  min-height: 60px;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  padding: 5px;
+  gap: 4px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,.50), rgba(240,246,255,.30));
+  border: 1px solid rgba(255,255,255,.16);
+  box-shadow: 0 18px 42px rgba(17,30,52,.18), 0 6px 14px rgba(17,30,52,.08), inset 0 1px 0 rgba(255,255,255,.28);
+}
+.bottomNav button {
+  min-height: 46px;
+  border-radius: 16px;
+  gap: 2px;
+  font-size: 9.5px;
+  color: var(--muted);
+}
+.bottomNav button svg { width: 20px; height: 20px; }
+.bottomNav button.active {
+  background: rgba(62,116,255,.10);
+  color: #2464df;
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .bottomNav {
+    background: linear-gradient(180deg, rgba(29,31,35,.94), rgba(24,26,31,.88));
+    border-color: rgba(255,255,255,.07);
+    box-shadow: 0 20px 48px rgba(0,0,0,.46), 0 6px 16px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  :root:not([data-theme="light"]) .bottomNav button { color: #9aa0aa; }
+  :root:not([data-theme="light"]) .bottomNav button.active { background: rgba(55,128,255,.14); color: #5596ff; }
+}
+:root[data-theme="dark"] .bottomNav {
+  background: linear-gradient(180deg, rgba(29,31,35,.94), rgba(24,26,31,.88));
+  border-color: rgba(255,255,255,.07);
+  box-shadow: 0 20px 48px rgba(0,0,0,.46), 0 6px 16px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.05);
+}
+:root[data-theme="dark"] .bottomNav button { color: #9aa0aa; }
+:root[data-theme="dark"] .bottomNav button.active { background: rgba(55,128,255,.14); color: #5596ff; }
+
+/* iOS Safari: date/time inputs have intrinsic width unless explicitly neutralized. */
+.eventForm,
+.eventForm .formCard,
+.eventForm .field,
+.eventForm .timeGrid,
+.eventForm .timeGrid > *,
+.eventForm .customReminder,
+.eventForm .customReminder > * {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.eventForm .formCard {
+  width: 100% !important;
+  overflow: hidden !important;
+  padding-inline: 16px !important;
+}
+
+.eventForm .field input,
+.eventForm .field textarea,
+.eventForm .field select,
+.eventForm input[type="date"],
+.eventForm input[type="time"] {
+  display: block !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  max-width: 100% !important;
+  max-inline-size: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+.eventForm input[type="date"],
+.eventForm input[type="time"] {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  padding-inline: 12px !important;
+}
+
+.eventForm input[type="date"]::-webkit-date-and-time-value,
+.eventForm input[type="time"]::-webkit-date-and-time-value,
+.eventForm input[type="date"]::-webkit-datetime-edit,
+.eventForm input[type="time"]::-webkit-datetime-edit,
+.eventForm input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+.eventForm input[type="time"]::-webkit-datetime-edit-fields-wrapper {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: right !important;
+}
+
+.eventForm .timeGrid {
+  width: 100% !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  overflow: hidden !important;
+}
+
+.eventForm .durationPreview {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 540px) {
+  .bottomNav { width: calc(100% - 16px); min-height: 58px; border-radius: 21px; }
+  .bottomNav button { min-height: 44px; }
+  .eventForm .formCard { padding-inline: 14px !important; }
+  .eventForm .timeGrid { gap: 8px !important; }
+}
